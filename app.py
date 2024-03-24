@@ -6,13 +6,13 @@ import cv2
 from paho.mqtt import client as mqtt_client
 from csv import writer
 from library import MainWindow
-from AddBook import MainWindow2
+from main import BookInfo
 from PyQt6.QtWidgets import QMainWindow, QApplication
 from PyQt6.QtGui import QIcon
 import sys
 import qrcode
 
-broker = '192.168.0.221'
+broker = '192.168.129.204'
 port = 1883
 topic1 = 'python/book'
 client_id = f'python-mqtt-{random.randint(0, 1000)}'
@@ -80,11 +80,9 @@ def issue_book():
     client.loop_start()
     book = qr_read()
     publish(client, book)
-    time.sleep(2)
-    publish(client, 'na')
     client.disconnect()
     formatted_time = date.today()
-    print(formatted_time)
+
     with open('book.csv', 'a', newline='') as f_object:
         writer_object = writer(f_object)
         writer_object.writerow([book, formatted_time, 'Out of stock'])
@@ -94,12 +92,10 @@ def return_book():
     client = connect_mqtt()
     client.loop_start()
     book = qr_read()
-    publish(client, book)
-    time.sleep(2)
-    publish(client, 'na')
+    publish(client, f'{book}-return')
     client.disconnect()
     formatted_time = date.today()
-    print(formatted_time)
+
     with open('book.csv', 'a', newline='') as f_object:
         writer_object = writer(f_object)
         writer_object.writerow([book, formatted_time, 'In stock'])
@@ -125,14 +121,34 @@ class MyWindow(QMainWindow):
         super(MyWindow, self).__init__()
         self.ui = MainWindow()
         self.ui.setupUi(self)
-        self.ui.pushButton.clicked.connect(lambda: AddBook())
+        self.ui.pushButton.clicked.connect(lambda: add_book())
         self.ui.pushButton_2.clicked.connect(lambda: issue_book())
         self.ui.pushButton_3.clicked.connect(lambda: return_book())
-        self.ui.pushButton_4.clicked.connect(lambda: search_book())
+        self.ui.pushButton_4.clicked.connect(lambda: self.book_info())
 
-    def AddBook(self):
-        self.window2 = MainWindow2()
-        self.window2.show()
+    def book_info(self):
+        book = qr_read()
+        with open('book.csv', 'r') as f_object:
+            arr = list(csv.reader(f_object))
+            for i in range(len(arr) - 1, -1, -1):
+                if arr[i][0] == book:
+                    row = arr[i]
+                    break
+        print(row)
+        issue = date.fromisoformat(row[1])
+        self.NewWindow = BookInfo()
+        print(1)
+        if row[2] == "Out of stock":
+            if (date.today() - issue).days > 30:
+                self.NewWindow.label4.setText("Книга просрочена")
+            else:
+                self.NewWindow.label4.setText(f"Срок пользования: {30 - (date.today() - issue).days}")
+        print(1)
+        self.NewWindow.label.setText(f"Книга: {row[0]}")
+        self.NewWindow.label2.setText(f"Взяли: {row[1]}")
+        self.NewWindow.label3.setText(f"Наличие: {row[2]}")
+        self.NewWindow.show()
+
 
 
 def main():
